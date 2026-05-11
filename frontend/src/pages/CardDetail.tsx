@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Building2, Wifi } from "lucide-react";
-import { api, uploadOffice, uploadWFH, fetchOfficeData, fetchWFHData } from "../lib/api";
+import { fetchCard, uploadOffice, uploadWFH, fetchOfficeData, fetchWFHData } from "../lib/api";
 import UploadZone from "../components/UploadZone";
 import ResultsTable from "../components/ResultsTable";
 import EmployeeLookup from "../components/EmployeeLookup";
@@ -28,7 +28,7 @@ export default function CardDetail() {
 
   useEffect(() => {
     if (!cardId) return;
-    api.get(`/cards/${cardId}`).then((r) => setCard(r.data));
+    fetchCard(cardId).then(setCard);
   }, [cardId]);
 
   const loadTable = useCallback(async (tab: Tab) => {
