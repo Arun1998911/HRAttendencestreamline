@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Building2, Wifi } from "lucide-react";
-import { fetchCard, uploadOffice, uploadWFH, fetchOfficeData, fetchWFHData } from "../lib/api";
+import { ArrowLeft, Building2, Wifi, CalendarX, CalendarCheck } from "lucide-react";
+import { fetchCard, uploadOffice, uploadWFH, uploadLeaveRequests, uploadWFHRequests, fetchOfficeData, fetchWFHData, fetchLeaveRequestsData, fetchWFHRequestsData } from "../lib/api";
 import UploadZone from "../components/UploadZone";
 import ResultsTable from "../components/ResultsTable";
 import EmployeeLookup from "../components/EmployeeLookup";
 
-type Tab = "office" | "wfh";
+type Tab = "office" | "wfh" | "leave" | "wfhreq";
 
 interface Card {
   cardid: string;
@@ -17,6 +17,8 @@ interface Card {
 
 const OFFICE_COLS = ["employeeid", "checkindate", "checkintime"];
 const WFH_COLS = ["employeeid", "employeename", "jobtitle", "department", "reportingmanager", "timestampclockin", "requesttype"];
+const LEAVE_COLS = ["employeeid", "employeename", "leavetype", "fromdate", "todate", "totalduration", "status"];
+const WFH_REQ_COLS = ["employeeid", "employeename", "requesttype", "requeststatus", "fromdate", "todate", "totalduration"];
 
 export default function CardDetail() {
   const { cardId } = useParams<{ cardId: string }>();
@@ -36,7 +38,11 @@ export default function CardDetail() {
     setTableLoading(true);
     setTableData(null);
     try {
-      const data = tab === "office" ? await fetchOfficeData(cardId) : await fetchWFHData(cardId);
+      const data =
+        tab === "office" ? await fetchOfficeData(cardId) :
+        tab === "wfh" ? await fetchWFHData(cardId) :
+        tab === "leave" ? await fetchLeaveRequestsData(cardId) :
+        await fetchWFHRequestsData(cardId);
       setTableData(data);
     } finally {
       setTableLoading(false);
@@ -85,6 +91,16 @@ export default function CardDetail() {
               description="Working Remotely clock-ins export (KSPL employee IDs)"
               onUpload={(file) => uploadWFH(cardId!, file).then((r) => { loadTable(activeTab); return r; })}
             />
+            <UploadZone
+              label="Leave Requests (optional)"
+              description="Employees Leave Requests export"
+              onUpload={(file) => uploadLeaveRequests(cardId!, file).then((r) => { loadTable(activeTab); return r; })}
+            />
+            <UploadZone
+              label="WFH Requests (optional)"
+              description="Attendance Working Remotely Requests export"
+              onUpload={(file) => uploadWFHRequests(cardId!, file).then((r) => { loadTable(activeTab); return r; })}
+            />
           </div>
         </div>
 
@@ -96,6 +112,8 @@ export default function CardDetail() {
           <div className="mb-3 flex items-center gap-1 border-b border-gray-200">
             <TabBtn active={activeTab === "office"} onClick={() => setActiveTab("office")} icon={<Building2 size={14} />} label="Office Check-in" count={activeTab === "office" ? tableData?.total : undefined} />
             <TabBtn active={activeTab === "wfh"} onClick={() => setActiveTab("wfh")} icon={<Wifi size={14} />} label="WFH Clock-in" count={activeTab === "wfh" ? tableData?.total : undefined} />
+            <TabBtn active={activeTab === "leave"} onClick={() => setActiveTab("leave")} icon={<CalendarX size={14} />} label="Leave Requests" count={activeTab === "leave" ? tableData?.total : undefined} />
+            <TabBtn active={activeTab === "wfhreq"} onClick={() => setActiveTab("wfhreq")} icon={<CalendarCheck size={14} />} label="WFH Requests" count={activeTab === "wfhreq" ? tableData?.total : undefined} />
           </div>
 
           {tableLoading && (
@@ -113,7 +131,15 @@ export default function CardDetail() {
           {!tableLoading && tableData && tableData.total > 0 && (
             <div className="space-y-2">
               <p className="text-xs text-gray-400">Showing {tableData.rows.length} of {tableData.total.toLocaleString()} rows</p>
-              <ResultsTable columns={activeTab === "office" ? OFFICE_COLS : WFH_COLS} rows={tableData.rows} />
+              <ResultsTable
+                columns={
+                  activeTab === "office" ? OFFICE_COLS :
+                  activeTab === "wfh" ? WFH_COLS :
+                  activeTab === "leave" ? LEAVE_COLS :
+                  WFH_REQ_COLS
+                }
+                rows={tableData.rows}
+              />
             </div>
           )}
         </div>

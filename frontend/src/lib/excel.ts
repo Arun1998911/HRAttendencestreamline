@@ -1,5 +1,17 @@
 import * as XLSX from "xlsx";
 
+function toISODate(val: unknown): string | null {
+  if (!val) return null;
+  if (val instanceof Date) return val.toISOString().split("T")[0];
+  return String(val);
+}
+
+function toISOTimestamp(val: unknown): string | null {
+  if (!val) return null;
+  if (val instanceof Date) return val.toISOString();
+  return String(val);
+}
+
 function excelDateToISO(val: unknown): { date: string; time: string } | null {
   if (!val) return null;
   let d: Date;
@@ -82,6 +94,90 @@ export function parseWFHClockin(buffer: ArrayBuffer, cardId: string) {
       longitude: row[col("Longitude")] ?? null,
       address: row[col("Address")] ?? null,
       note: row[col("Note")] ?? null,
+    });
+  }
+  return records;
+}
+
+export function parseLeaveRequests(buffer: ArrayBuffer, cardId: string) {
+  const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
+
+  const headers = (rows[2] as string[]) ?? [];
+  const col = (name: string) => headers.indexOf(name);
+
+  const records: Record<string, unknown>[] = [];
+  for (let i = 3; i < rows.length; i++) {
+    const row = rows[i] as unknown[];
+    if (!row || row.every((v) => v === null || v === undefined || v === "")) continue;
+    records.push({
+      cardid: cardId,
+      employeeid: String(row[col("Employee Number")] ?? ""),
+      employeename: row[col("Employee Name")] ?? null,
+      jobtitle: row[col("Job Title")] ?? null,
+      businessunit: row[col("Business Unit")] ?? null,
+      department: row[col("Department")] ?? null,
+      subdepartment: row[col("Sub Department")] ?? null,
+      location: row[col("Location")] ?? null,
+      costcenter: row[col("Cost Center")] ?? null,
+      reportingmanager: row[col("Reporting Manager")] ?? null,
+      leavetype: row[col("Leave Types")] ?? null,
+      fromdate: toISODate(row[col("From Date")]),
+      fromsession: row[col("From Session")] ?? null,
+      todate: toISODate(row[col("To Date")]),
+      tosession: row[col("To Session")] ?? null,
+      totalduration: row[col("Total Duration")] != null ? String(row[col("Total Duration")]) : null,
+      unit: row[col("Unit")] ?? null,
+      requestedon: toISOTimestamp(row[col("Requested On")]),
+      requestedby: row[col("Requested By")] ?? null,
+      note: row[col("Note")] ?? null,
+      reason: row[col("Reason")] ?? null,
+      status: row[col("Status")] ?? null,
+      lastactiontakenby: row[col("Last Action Taken by")] ?? null,
+      lastactiontakenon: toISOTimestamp(row[col("Last Action Taken on")]),
+      nextapprover: row[col("Next Approver")] ?? null,
+    });
+  }
+  return records;
+}
+
+export function parseWFHRequests(buffer: ArrayBuffer, cardId: string) {
+  const wb = XLSX.read(buffer, { type: "array", cellDates: true });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
+
+  const headers = (rows[2] as string[]) ?? [];
+  const col = (name: string) => headers.indexOf(name);
+
+  const records: Record<string, unknown>[] = [];
+  for (let i = 3; i < rows.length; i++) {
+    const row = rows[i] as unknown[];
+    if (!row || row.every((v) => v === null || v === undefined || v === "")) continue;
+    records.push({
+      cardid: cardId,
+      employeeid: String(row[col("Employee Number")] ?? ""),
+      employeename: row[col("Employee Name")] ?? null,
+      jobtitle: row[col("Job Title")] ?? null,
+      businessunit: row[col("Business Unit")] ?? null,
+      department: row[col("Department")] ?? null,
+      subdepartment: row[col("Sub Department")] ?? null,
+      location: row[col("Location")] ?? null,
+      costcenter: row[col("Cost Center")] ?? null,
+      reportingmanager: row[col("Reporting Manager")] ?? null,
+      requesttype: row[col("Request Type")] ?? null,
+      requeststatus: row[col("Request Status")] ?? null,
+      rejectionreason: row[col("Rejection/Cancellation Reason")] ?? null,
+      fromdate: toISODate(row[col("From Date")]),
+      todate: toISODate(row[col("To Date")]),
+      totalduration: row[col("Total Duration")] != null ? String(row[col("Total Duration")]) : null,
+      requestedon: toISOTimestamp(row[col("Requested On")]),
+      requester: row[col("Requester")] ?? null,
+      note: row[col("Note")] ?? null,
+      reason: row[col("Reason")] ?? null,
+      actiontakenby: row[col("Action Taken By")] ?? null,
+      actiontakenon: toISOTimestamp(row[col("Action Taken On")]),
+      nextapprover: row[col("Next Approver")] ?? null,
     });
   }
   return records;

@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import { parseOfficeCheckin, parseWFHClockin } from "./excel";
+import { parseOfficeCheckin, parseWFHClockin, parseLeaveRequests, parseWFHRequests } from "./excel";
 import { v4 as uuidv4 } from "uuid";
 
 export interface ReportCard {
@@ -90,6 +90,44 @@ export async function fetchWFHData(cardId: string, limit = 100, offset = 0) {
   return { rows: data ?? [], total: count ?? 0 };
 }
 
+export async function uploadLeaveRequests(cardId: string, file: File): Promise<{ rows_imported: number }> {
+  const buffer = await file.arrayBuffer();
+  const records = parseLeaveRequests(buffer, cardId);
+  if (!records.length) throw new Error("No rows found in Leave Requests file");
+  await supabase.from("LEAVE_REQUESTS_TB").delete().eq("cardid", cardId);
+  await batchInsert("LEAVE_REQUESTS_TB", records);
+  return { rows_imported: records.length };
+}
+
+export async function uploadWFHRequests(cardId: string, file: File): Promise<{ rows_imported: number }> {
+  const buffer = await file.arrayBuffer();
+  const records = parseWFHRequests(buffer, cardId);
+  if (!records.length) throw new Error("No rows found in WFH Requests file");
+  await supabase.from("WFH_REQUESTS_TB").delete().eq("cardid", cardId);
+  await batchInsert("WFH_REQUESTS_TB", records);
+  return { rows_imported: records.length };
+}
+
+export async function fetchLeaveRequestsData(cardId: string, limit = 100, offset = 0) {
+  const { data, error, count } = await supabase
+    .from("LEAVE_REQUESTS_TB")
+    .select("*", { count: "exact" })
+    .eq("cardid", cardId)
+    .range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
+  return { rows: data ?? [], total: count ?? 0 };
+}
+
+export async function fetchWFHRequestsData(cardId: string, limit = 100, offset = 0) {
+  const { data, error, count } = await supabase
+    .from("WFH_REQUESTS_TB")
+    .select("*", { count: "exact" })
+    .eq("cardid", cardId)
+    .range(offset, offset + limit - 1);
+  if (error) throw new Error(error.message);
+  return { rows: data ?? [], total: count ?? 0 };
+}
+
 // ---------------------------------------------------------------------------
 // Employee summary (computed client-side)
 // ---------------------------------------------------------------------------
@@ -101,13 +139,35 @@ export interface EmployeeSummary {
   reportingmanager: string;
   officedayscount: number;
   wfhdayscount: number;
-  calendar: { checkindate: string; officefirstcheckin: string; wfhtimes: string }[];
+  leavedayscount: number;
+  wfhrequestdayscount: number;
+  calendar: {
+    checkindate: string;
+    officefirstcheckin: string;
+    wfhtimes: string;
+    leavetype: string;
+    leavestatus: string;
+    wfhrequeststatus: string;
+  }[];
+}
+
+function expandDateRange(from: string, to: string): string[] {
+  const dates: string[] = [];
+  const end = new Date(to);
+  const cur = new Date(from);
+  while (cur <= end) {
+    dates.push(cur.toISOString().split("T")[0]);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return dates;
 }
 
 export async function fetchEmployeeSummary(cardId: string, employeeId: string): Promise<EmployeeSummary> {
-  const [{ data: officeRows }, { data: wfhRows }] = await Promise.all([
+  const [{ data: officeRows }, { data: wfhRows }, { data: leaveRows }, { data: wfhReqRows }] = await Promise.all([
     supabase.from("OFFICE_CHECKIN_TB").select("*").eq("cardid", cardId).eq("employeeid", employeeId),
     supabase.from("WFH_CLOCKIN_TB").select("*").eq("cardid", cardId).eq("employeeid", employeeId),
+    supabase.from("LEAVE_REQUESTS_TB").select("*").eq("cardid", cardId).eq("employeeid", employeeId),
+    supabase.from("WFH_REQUESTS_TB").select("*").eq("cardid", cardId).eq("employeeid", employeeId),
   ]);
 
   // Office: first check-in per date
@@ -120,7 +180,7 @@ export async function fetchEmployeeSummary(cardId: string, employeeId: string): 
     }
   }
 
-  // WFH: all clock-in times per date
+  // WFH clock-ins: all times per date
   const wfhDateMap: Record<string, string[]> = {};
   let employeename = "", department = "", reportingmanager = "";
   for (const row of (wfhRows ?? [])) {
@@ -135,12 +195,44 @@ export async function fetchEmployeeSummary(cardId: string, employeeId: string): 
     if (!reportingmanager) reportingmanager = row.reportingmanager ?? "";
   }
 
-  // Merge dates
-  const allDates = [...new Set([...Object.keys(officeDateMap), ...Object.keys(wfhDateMap)])].sort();
+  // Leave requests: expand date ranges
+  const leaveDateMap: Record<string, { leavetype: string; status: string }> = {};
+  for (const row of (leaveRows ?? [])) {
+    if (!row.fromdate || !row.todate) continue;
+    for (const d of expandDateRange(row.fromdate, row.todate)) {
+      leaveDateMap[d] = { leavetype: row.leavetype ?? "", status: row.status ?? "" };
+    }
+    if (!employeename) employeename = row.employeename ?? "";
+    if (!department) department = row.department ?? "";
+    if (!reportingmanager) reportingmanager = row.reportingmanager ?? "";
+  }
+
+  // WFH requests: expand date ranges
+  const wfhReqDateMap: Record<string, string> = {};
+  for (const row of (wfhReqRows ?? [])) {
+    if (!row.fromdate || !row.todate) continue;
+    for (const d of expandDateRange(row.fromdate, row.todate)) {
+      wfhReqDateMap[d] = row.requeststatus ?? "";
+    }
+    if (!employeename) employeename = row.employeename ?? "";
+    if (!department) department = row.department ?? "";
+    if (!reportingmanager) reportingmanager = row.reportingmanager ?? "";
+  }
+
+  const allDates = [...new Set([
+    ...Object.keys(officeDateMap),
+    ...Object.keys(wfhDateMap),
+    ...Object.keys(leaveDateMap),
+    ...Object.keys(wfhReqDateMap),
+  ])].sort();
+
   const calendar = allDates.map((d) => ({
     checkindate: d,
     officefirstcheckin: officeDateMap[d] ?? "",
     wfhtimes: (wfhDateMap[d] ?? []).sort().join(", "),
+    leavetype: leaveDateMap[d]?.leavetype ?? "",
+    leavestatus: leaveDateMap[d]?.status ?? "",
+    wfhrequeststatus: wfhReqDateMap[d] ?? "",
   }));
 
   return {
@@ -150,6 +242,8 @@ export async function fetchEmployeeSummary(cardId: string, employeeId: string): 
     reportingmanager,
     officedayscount: Object.keys(officeDateMap).length,
     wfhdayscount: Object.keys(wfhDateMap).length,
+    leavedayscount: Object.keys(leaveDateMap).length,
+    wfhrequestdayscount: Object.keys(wfhReqDateMap).length,
     calendar,
   };
 }

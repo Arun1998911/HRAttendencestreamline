@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search, Building2, Wifi, User, Briefcase, UserCheck } from "lucide-react";
+import { Search, Building2, Wifi, User, Briefcase, UserCheck, CalendarX, CalendarCheck } from "lucide-react";
 import { fetchEmployeeSummary, type EmployeeSummary } from "../lib/api";
 
 interface Props {
@@ -21,7 +21,7 @@ export default function EmployeeLookup({ cardId }: Props) {
     setSummary(null);
     try {
       const data = await fetchEmployeeSummary(cardId, id);
-      if (!data.officedayscount && !data.wfhdayscount) {
+      if (!data.officedayscount && !data.wfhdayscount && !data.leavedayscount && !data.wfhrequestdayscount) {
         setError(`No data found for ${id}`);
       } else {
         setSummary(data);
@@ -68,7 +68,7 @@ export default function EmployeeLookup({ cardId }: Props) {
           </div>
 
           {/* Summary counts */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3">
               <div className="rounded-lg bg-blue-600 p-2">
                 <Building2 size={16} className="text-white" />
@@ -87,6 +87,24 @@ export default function EmployeeLookup({ cardId }: Props) {
                 <p className="text-2xl font-bold text-green-700">{summary.wfhdayscount}</p>
               </div>
             </div>
+            <div className="flex items-center gap-3 rounded-lg border border-orange-100 bg-orange-50 px-4 py-3">
+              <div className="rounded-lg bg-orange-500 p-2">
+                <CalendarX size={16} className="text-white" />
+              </div>
+              <div>
+                <p className="text-xs text-orange-600 font-medium">Leave Days</p>
+                <p className="text-2xl font-bold text-orange-700">{summary.leavedayscount}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 rounded-lg border border-purple-100 bg-purple-50 px-4 py-3">
+              <div className="rounded-lg bg-purple-600 p-2">
+                <CalendarCheck size={16} className="text-white" />
+              </div>
+              <div>
+                <p className="text-xs text-purple-600 font-medium">WFH Requests</p>
+                <p className="text-2xl font-bold text-purple-700">{summary.wfhrequestdayscount}</p>
+              </div>
+            </div>
           </div>
 
           {/* Calendar table */}
@@ -97,6 +115,8 @@ export default function EmployeeLookup({ cardId }: Props) {
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Date</th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Office (first check-in)</th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">WFH clock-ins</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Leave</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">WFH Request</th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
                 </tr>
               </thead>
@@ -104,6 +124,8 @@ export default function EmployeeLookup({ cardId }: Props) {
                 {summary.calendar.map((row) => {
                   const isOffice = !!row.officefirstcheckin;
                   const isWFH = !!row.wfhtimes;
+                  const isLeave = !!row.leavetype;
+                  const isWFHReq = !!row.wfhrequeststatus;
                   return (
                     <tr key={row.checkindate} className="hover:bg-gray-50">
                       <td className="px-4 py-2 font-medium text-gray-800">
@@ -112,12 +134,34 @@ export default function EmployeeLookup({ cardId }: Props) {
                       <td className="px-4 py-2 text-gray-600">{row.officefirstcheckin || "—"}</td>
                       <td className="px-4 py-2 text-gray-600">{row.wfhtimes || "—"}</td>
                       <td className="px-4 py-2">
-                        {isOffice && isWFH ? (
+                        {isLeave ? (
+                          <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700" title={row.leavestatus}>
+                            {row.leavetype}
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-4 py-2">
+                        {isWFHReq ? (
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            row.wfhrequeststatus === "Approved"
+                              ? "bg-purple-100 text-purple-700"
+                              : "bg-gray-100 text-gray-600"
+                          }`}>
+                            {row.wfhrequeststatus}
+                          </span>
+                        ) : "—"}
+                      </td>
+                      <td className="px-4 py-2">
+                        {isLeave ? (
+                          <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">Leave</span>
+                        ) : isOffice && isWFH ? (
                           <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">Both</span>
                         ) : isOffice ? (
                           <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">Office</span>
                         ) : isWFH ? (
                           <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">WFH</span>
+                        ) : isWFHReq ? (
+                          <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">WFH Req</span>
                         ) : null}
                       </td>
                     </tr>
