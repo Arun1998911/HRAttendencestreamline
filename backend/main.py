@@ -239,13 +239,20 @@ def get_employee_summary(card_id: str, employee_id: str):
 
 app.include_router(router)
 
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+# Resolve from repo root (works both locally and on Railway)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.normpath(os.path.join(BASE_DIR, "..", "frontend", "dist"))
+INDEX_FILE = os.path.join(STATIC_DIR, "index.html")
+
+print(f"[static] STATIC_DIR={STATIC_DIR} exists={os.path.exists(STATIC_DIR)}")
 
 if os.path.exists(STATIC_DIR):
     assets_dir = os.path.join(STATIC_DIR, "assets")
     if os.path.exists(assets_dir):
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
 
-    @app.get("/{full_path:path}")
-    def serve_spa(full_path: str):
-        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+@app.get("/{full_path:path}")
+def serve_spa(full_path: str):
+    if os.path.exists(INDEX_FILE):
+        return FileResponse(INDEX_FILE)
+    return {"error": f"Frontend not built. STATIC_DIR={STATIC_DIR}"}
