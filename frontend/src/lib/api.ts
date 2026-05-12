@@ -164,8 +164,6 @@ export async function fetchConsolidatedReport(cardId: string): Promise<Consolida
 
   const s = (v: unknown): string => (v as string) ?? "";
 
-  // Fill employee info field-by-field: each field updates independently as
-  // soon as a non-empty value is found across any table and any row.
   const mergeEmpInfo = (id: string, name: string, dept: string, manager: string) => {
     if (!empInfo[id]) empInfo[id] = { name: "", dept: "", manager: "" };
     if (!empInfo[id].name && name) empInfo[id].name = name;
@@ -180,42 +178,67 @@ export async function fetchConsolidatedReport(cardId: string): Promise<Consolida
     const c = cell(id, d);
     const t = s(row.checkintime);
     if (!c.officecheckin || t < c.officecheckin) c.officecheckin = t;
-    // OFFICE_CHECKIN_TB has no name columns — empInfo filled from other tables
   }
 
   for (const row of wfhRows) {
     const id = s(row.employeeid);
+    if (!id) continue;
+    // Capture name from EVERY row before any timestamp check
+    mergeEmpInfo(id, s(row.employeename), s(row.department), s(row.reportingmanager));
     const ts = s(row.timestampclockin);
-    if (!id || !ts) continue;
+    if (!ts) continue;
     const d = ts.includes("T") ? ts.split("T")[0] : ts.split(" ")[0];
     const t = ts.includes("T") ? ts.split("T")[1]?.slice(0, 8) : ts.split(" ")[1]?.slice(0, 8);
     const c = cell(id, d);
     if (t) c.wfhclockinsArr.push(t);
-    mergeEmpInfo(id, s(row.employeename), s(row.department), s(row.reportingmanager));
   }
 
   for (const row of leaveRows) {
     const id = s(row.employeeid);
+    if (!id) continue;
+    // Capture name from EVERY row before any date check
+    mergeEmpInfo(id, s(row.employeename), s(row.department), s(row.reportingmanager));
     const from = s(row.fromdate);
     const to = s(row.todate);
-    if (!id || !from || !to) continue;
+    if (!from || !to) continue;
     for (const d of expandDateRange(from, to)) {
       const c = cell(id, d);
       c.leavetype = s(row.leavetype);
       c.leavestatus = s(row.status);
     }
-    mergeEmpInfo(id, s(row.employeename), s(row.department), s(row.reportingmanager));
   }
 
   for (const row of wfhReqRows) {
     const id = s(row.employeeid);
+    if (!id) continue;
+    // Capture name from EVERY row before any date check
+    mergeEmpInfo(id, s(row.employeename), s(row.department), s(row.reportingmanager));
     const from = s(row.fromdate);
     const to = s(row.todate);
-    if (!id || !from || !to) continue;
+    if (!from || !to) continue;
     for (const d of expandDateRange(from, to)) {
       cell(id, d).wfhrequeststatus = s(row.requeststatus);
     }
-    mergeEmpInfo(id, s(row.employeename), s(row.department), s(row.reportingmanager));
+  }
+
+  // Cross-card fallback: employees who only appear in OFFICE_CHECKIN_TB for
+  // this card have no name above. Look them up across ALL cards in every
+  // name-bearing table so no employee ID is left without a name.
+  const needNames = [...new Set([
+    ...Object.keys(dataMap).filter(id => !empInfo[id]?.name),
+    ...Object.entries(empInfo).filter(([, i]) => !i.name).map(([id]) => id),
+  ])];
+
+  if (needNames.length > 0) {
+    const [{ data: w }, { data: l }, { data: r }] = await Promise.all([
+      supabase.from("WFH_CLOCKIN_TB").select("employeeid,employeename,department,reportingmanager").in("employeeid", needNames),
+      supabase.from("LEAVE_REQUESTS_TB").select("employeeid,employeename,department,reportingmanager").in("employeeid", needNames),
+      supabase.from("WFH_REQUESTS_TB").select("employeeid,employeename,department,reportingmanager").in("employeeid", needNames),
+    ]);
+    for (const row of [...(w ?? []), ...(l ?? []), ...(r ?? [])]) {
+      const id = s(row.employeeid);
+      if (id) mergeEmpInfo(id, s(row.employeename), s(row.department), s(row.reportingmanager));
+    }
   }
 
   const result: ConsolidatedRow[] = [];
