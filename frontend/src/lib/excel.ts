@@ -40,6 +40,9 @@ export function parseOfficeCheckin(buffer: ArrayBuffer, cardId: string) {
   const headers = (rows[1] as string[]) ?? [];
   const timeIdx = headers.indexOf("Time");
   const personnelIdx = headers.indexOf("Personnel ID");
+  const firstNameIdx = headers.indexOf("First Name");
+  const lastNameIdx = headers.indexOf("Last Name");
+  const deptIdx = headers.indexOf("Department Name");
 
   const records: Record<string, unknown>[] = [];
   for (let i = 2; i < rows.length; i++) {
@@ -48,12 +51,18 @@ export function parseOfficeCheckin(buffer: ArrayBuffer, cardId: string) {
     const numId = Number(rawId);
     if (!rawId || isNaN(numId) || numId <= 0) continue;
 
+    const firstName = String(row[firstNameIdx] ?? "").trim();
+    const lastName = String(row[lastNameIdx] ?? "").trim();
+    const fullName = [firstName, lastName].filter(Boolean).join(" ") || null;
+
     const dt = excelDateToISO(row[timeIdx]);
     records.push({
       cardid: cardId,
       employeeid: `KSPL${Math.floor(numId).toString().padStart(3, "0")}`,
       checkindate: dt?.date ?? null,
       checkintime: dt?.time ?? null,
+      employeename: fullName,
+      department: row[deptIdx] ? String(row[deptIdx]).trim() || null : null,
     });
   }
   return records;

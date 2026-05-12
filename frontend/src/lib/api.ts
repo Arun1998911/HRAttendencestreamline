@@ -178,6 +178,7 @@ export async function fetchConsolidatedReport(cardId: string): Promise<Consolida
     const c = cell(id, d);
     const t = s(row.checkintime);
     if (!c.officecheckin || t < c.officecheckin) c.officecheckin = t;
+    mergeEmpInfo(id, s(row.employeename), s(row.department), "");
   }
 
   for (const row of wfhRows) {
@@ -306,19 +307,21 @@ export async function fetchEmployeeSummary(cardId: string, employeeId: string): 
     supabase.from("WFH_REQUESTS_TB").select("*").eq("cardid", cardId).eq("employeeid", employeeId),
   ]);
 
-  // Office: first check-in per date
+  // Office: first check-in per date + grab name/dept if available
   const officeDateMap: Record<string, string> = {};
+  let employeename = "", department = "", reportingmanager = "";
   for (const row of (officeRows ?? [])) {
     const d = row.checkindate as string;
     if (!d) continue;
     if (!officeDateMap[d] || row.checkintime < officeDateMap[d]) {
       officeDateMap[d] = row.checkintime as string;
     }
+    if (!employeename && row.employeename) employeename = row.employeename as string;
+    if (!department && row.department) department = row.department as string;
   }
 
   // WFH clock-ins: all times per date
   const wfhDateMap: Record<string, string[]> = {};
-  let employeename = "", department = "", reportingmanager = "";
   for (const row of (wfhRows ?? [])) {
     const ts = row.timestampclockin as string;
     if (!ts) continue;
