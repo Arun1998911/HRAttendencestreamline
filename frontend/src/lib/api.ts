@@ -164,6 +164,15 @@ export async function fetchConsolidatedReport(cardId: string): Promise<Consolida
 
   const s = (v: unknown): string => (v as string) ?? "";
 
+  // Fill employee info field-by-field: each field updates independently as
+  // soon as a non-empty value is found across any table and any row.
+  const mergeEmpInfo = (id: string, name: string, dept: string, manager: string) => {
+    if (!empInfo[id]) empInfo[id] = { name: "", dept: "", manager: "" };
+    if (!empInfo[id].name && name) empInfo[id].name = name;
+    if (!empInfo[id].dept && dept) empInfo[id].dept = dept;
+    if (!empInfo[id].manager && manager) empInfo[id].manager = manager;
+  };
+
   for (const row of officeRows) {
     const id = s(row.employeeid);
     const d = s(row.checkindate);
@@ -171,6 +180,7 @@ export async function fetchConsolidatedReport(cardId: string): Promise<Consolida
     const c = cell(id, d);
     const t = s(row.checkintime);
     if (!c.officecheckin || t < c.officecheckin) c.officecheckin = t;
+    // OFFICE_CHECKIN_TB has no name columns — empInfo filled from other tables
   }
 
   for (const row of wfhRows) {
@@ -181,7 +191,7 @@ export async function fetchConsolidatedReport(cardId: string): Promise<Consolida
     const t = ts.includes("T") ? ts.split("T")[1]?.slice(0, 8) : ts.split(" ")[1]?.slice(0, 8);
     const c = cell(id, d);
     if (t) c.wfhclockinsArr.push(t);
-    if (!empInfo[id]) empInfo[id] = { name: s(row.employeename), dept: s(row.department), manager: s(row.reportingmanager) };
+    mergeEmpInfo(id, s(row.employeename), s(row.department), s(row.reportingmanager));
   }
 
   for (const row of leaveRows) {
@@ -194,7 +204,7 @@ export async function fetchConsolidatedReport(cardId: string): Promise<Consolida
       c.leavetype = s(row.leavetype);
       c.leavestatus = s(row.status);
     }
-    if (!empInfo[id]) empInfo[id] = { name: s(row.employeename), dept: s(row.department), manager: s(row.reportingmanager) };
+    mergeEmpInfo(id, s(row.employeename), s(row.department), s(row.reportingmanager));
   }
 
   for (const row of wfhReqRows) {
@@ -205,7 +215,7 @@ export async function fetchConsolidatedReport(cardId: string): Promise<Consolida
     for (const d of expandDateRange(from, to)) {
       cell(id, d).wfhrequeststatus = s(row.requeststatus);
     }
-    if (!empInfo[id]) empInfo[id] = { name: s(row.employeename), dept: s(row.department), manager: s(row.reportingmanager) };
+    mergeEmpInfo(id, s(row.employeename), s(row.department), s(row.reportingmanager));
   }
 
   const result: ConsolidatedRow[] = [];
