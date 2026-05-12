@@ -1,12 +1,13 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Building2, Wifi, CalendarX, CalendarCheck } from "lucide-react";
+import { ArrowLeft, Building2, Wifi, CalendarX, CalendarCheck, LayoutList } from "lucide-react";
 import { fetchCard, uploadOffice, uploadWFH, uploadLeaveRequests, uploadWFHRequests, fetchOfficeData, fetchWFHData, fetchLeaveRequestsData, fetchWFHRequestsData } from "../lib/api";
 import UploadZone from "../components/UploadZone";
 import ResultsTable from "../components/ResultsTable";
 import EmployeeLookup from "../components/EmployeeLookup";
+import ConsolidatedReport from "../components/ConsolidatedReport";
 
-type Tab = "office" | "wfh" | "leave" | "wfhreq";
+type Tab = "office" | "wfh" | "leave" | "wfhreq" | "report";
 
 interface Card {
   cardid: string;
@@ -50,7 +51,7 @@ export default function CardDetail() {
   }, [cardId]);
 
   useEffect(() => {
-    loadTable(activeTab);
+    if (activeTab !== "report") loadTable(activeTab);
   }, [activeTab, loadTable]);
 
   return (
@@ -114,21 +115,26 @@ export default function CardDetail() {
             <TabBtn active={activeTab === "wfh"} onClick={() => setActiveTab("wfh")} icon={<Wifi size={14} />} label="WFH Clock-in" count={activeTab === "wfh" ? tableData?.total : undefined} />
             <TabBtn active={activeTab === "leave"} onClick={() => setActiveTab("leave")} icon={<CalendarX size={14} />} label="Leave Requests" count={activeTab === "leave" ? tableData?.total : undefined} />
             <TabBtn active={activeTab === "wfhreq"} onClick={() => setActiveTab("wfhreq")} icon={<CalendarCheck size={14} />} label="WFH Requests" count={activeTab === "wfhreq" ? tableData?.total : undefined} />
+            <TabBtn active={activeTab === "report"} onClick={() => setActiveTab("report")} icon={<LayoutList size={14} />} label="Consolidated Report" />
           </div>
 
-          {tableLoading && (
+          {activeTab === "report" && cardId && (
+            <ConsolidatedReport cardId={cardId} />
+          )}
+
+          {activeTab !== "report" && tableLoading && (
             <div className="flex justify-center py-16">
               <div className="h-7 w-7 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
             </div>
           )}
 
-          {!tableLoading && tableData?.total === 0 && (
+          {activeTab !== "report" && !tableLoading && tableData?.total === 0 && (
             <div className="rounded-xl border border-dashed border-gray-200 py-16 text-center">
               <p className="text-sm text-gray-400">No data yet — upload a file above</p>
             </div>
           )}
 
-          {!tableLoading && tableData && tableData.total > 0 && (
+          {activeTab !== "report" && !tableLoading && tableData && tableData.total > 0 && (
             <div className="space-y-2">
               <p className="text-xs text-gray-400">Showing {tableData.rows.length} of {tableData.total.toLocaleString()} rows</p>
               <ResultsTable

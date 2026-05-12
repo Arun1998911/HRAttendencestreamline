@@ -129,6 +129,103 @@ export async function fetchWFHRequestsData(cardId: string, limit = 100, offset =
 }
 
 // ---------------------------------------------------------------------------
+// Consolidated report (all 4 sources merged per employee × date)
+// ---------------------------------------------------------------------------
+
+export interface ConsolidatedRow {
+  employeeid: string;
+  employeename: string;
+  department: string;
+  reportingmanager: string;
+  date: string;
+  officecheckin: string;
+  wfhclockins: string;
+  leavetype: string;
+  leavestatus: string;
+  wfhrequeststatus: string;
+}
+
+export async function fetchConsolidatedReport(cardId: string): Promise<ConsolidatedRow[]> {
+  const [{ data: officeRows }, { data: wfhRows }, { data: leaveRows }, { data: wfhReqRows }] = await Promise.all([
+    supabase.from("OFFICE_CHECKIN_TB").select("*").eq("cardid", cardId),
+    supabase.from("WFH_CLOCKIN_TB").select("*").eq("cardid", cardId),
+    supabase.from("LEAVE_REQUESTS_TB").select("*").eq("cardid", cardId),
+    supabase.from("WFH_REQUESTS_TB").select("*").eq("cardid", cardId),
+  ]);
+
+  type Cell = { officecheckin: string; wfhclockinsArr: string[]; leavetype: string; leavestatus: string; wfhrequeststatus: string };
+  const dataMap: Record<string, Record<string, Cell>> = {};
+  const empInfo: Record<string, { name: string; dept: string; manager: string }> = {};
+
+  const cell = (empId: string, date: string): Cell => {
+    if (!dataMap[empId]) dataMap[empId] = {};
+    if (!dataMap[empId][date]) dataMap[empId][date] = { officecheckin: "", wfhclockinsArr: [], leavetype: "", leavestatus: "", wfhrequeststatus: "" };
+    return dataMap[empId][date];
+  };
+
+  for (const row of officeRows ?? []) {
+    const id = row.employeeid as string;
+    const d = row.checkindate as string;
+    if (!id || !d) continue;
+    const c = cell(id, d);
+    if (!c.officecheckin || (row.checkintime as string) < c.officecheckin) c.officecheckin = row.checkintime ?? "";
+  }
+
+  for (const row of wfhRows ?? []) {
+    const id = row.employeeid as string;
+    const ts = row.timestampclockin as string;
+    if (!id || !ts) continue;
+    const d = ts.includes("T") ? ts.split("T")[0] : ts.split(" ")[0];
+    const t = ts.includes("T") ? ts.split("T")[1]?.slice(0, 8) : ts.split(" ")[1]?.slice(0, 8);
+    const c = cell(id, d);
+    if (t) c.wfhclockinsArr.push(t);
+    if (!empInfo[id]) empInfo[id] = { name: row.employeename ?? "", dept: row.department ?? "", manager: row.reportingmanager ?? "" };
+  }
+
+  for (const row of leaveRows ?? []) {
+    const id = row.employeeid as string;
+    if (!id || !row.fromdate || !row.todate) continue;
+    for (const d of expandDateRange(row.fromdate, row.todate)) {
+      const c = cell(id, d);
+      c.leavetype = row.leavetype ?? "";
+      c.leavestatus = row.status ?? "";
+    }
+    if (!empInfo[id]) empInfo[id] = { name: row.employeename ?? "", dept: row.department ?? "", manager: row.reportingmanager ?? "" };
+  }
+
+  for (const row of wfhReqRows ?? []) {
+    const id = row.employeeid as string;
+    if (!id || !row.fromdate || !row.todate) continue;
+    for (const d of expandDateRange(row.fromdate, row.todate)) {
+      cell(id, d).wfhrequeststatus = row.requeststatus ?? "";
+    }
+    if (!empInfo[id]) empInfo[id] = { name: row.employeename ?? "", dept: row.department ?? "", manager: row.reportingmanager ?? "" };
+  }
+
+  const result: ConsolidatedRow[] = [];
+  for (const [empId, dates] of Object.entries(dataMap)) {
+    const info = empInfo[empId] ?? { name: "", dept: "", manager: "" };
+    for (const [date, c] of Object.entries(dates)) {
+      result.push({
+        employeeid: empId,
+        employeename: info.name,
+        department: info.dept,
+        reportingmanager: info.manager,
+        date,
+        officecheckin: c.officecheckin,
+        wfhclockins: c.wfhclockinsArr.sort().join(", "),
+        leavetype: c.leavetype,
+        leavestatus: c.leavestatus,
+        wfhrequeststatus: c.wfhrequeststatus,
+      });
+    }
+  }
+
+  result.sort((a, b) => a.employeeid.localeCompare(b.employeeid) || a.date.localeCompare(b.date));
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Employee summary (computed client-side)
 // ---------------------------------------------------------------------------
 
