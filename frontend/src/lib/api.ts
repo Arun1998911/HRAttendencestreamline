@@ -67,27 +67,36 @@ export async function uploadWFH(cardId: string, file: File): Promise<{ rows_impo
 }
 
 // ---------------------------------------------------------------------------
-// Data fetch
+// Data fetch — paginated to retrieve every row regardless of table size
 // ---------------------------------------------------------------------------
 
-export async function fetchOfficeData(cardId: string, limit = 100, offset = 0) {
-  const { data, error, count } = await supabase
-    .from("OFFICE_CHECKIN_TB")
-    .select("*", { count: "exact" })
-    .eq("cardid", cardId)
-    .range(offset, offset + limit - 1);
-  if (error) throw new Error(error.message);
-  return { rows: data ?? [], total: count ?? 0 };
+async function fetchAllRows(table: string, cardId: string): Promise<Record<string, unknown>[]> {
+  const PAGE = 1000;
+  const all: Record<string, unknown>[] = [];
+  let offset = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from(table)
+      .select("*")
+      .eq("cardid", cardId)
+      .range(offset, offset + PAGE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    all.push(...(data as Record<string, unknown>[]));
+    if (data.length < PAGE) break;
+    offset += PAGE;
+  }
+  return all;
 }
 
-export async function fetchWFHData(cardId: string, limit = 100, offset = 0) {
-  const { data, error, count } = await supabase
-    .from("WFH_CLOCKIN_TB")
-    .select("*", { count: "exact" })
-    .eq("cardid", cardId)
-    .range(offset, offset + limit - 1);
-  if (error) throw new Error(error.message);
-  return { rows: data ?? [], total: count ?? 0 };
+export async function fetchOfficeData(cardId: string) {
+  const rows = await fetchAllRows("OFFICE_CHECKIN_TB", cardId);
+  return { rows, total: rows.length };
+}
+
+export async function fetchWFHData(cardId: string) {
+  const rows = await fetchAllRows("WFH_CLOCKIN_TB", cardId);
+  return { rows, total: rows.length };
 }
 
 export async function uploadLeaveRequests(cardId: string, file: File): Promise<{ rows_imported: number }> {
@@ -108,24 +117,14 @@ export async function uploadWFHRequests(cardId: string, file: File): Promise<{ r
   return { rows_imported: records.length };
 }
 
-export async function fetchLeaveRequestsData(cardId: string, limit = 100, offset = 0) {
-  const { data, error, count } = await supabase
-    .from("LEAVE_REQUESTS_TB")
-    .select("*", { count: "exact" })
-    .eq("cardid", cardId)
-    .range(offset, offset + limit - 1);
-  if (error) throw new Error(error.message);
-  return { rows: data ?? [], total: count ?? 0 };
+export async function fetchLeaveRequestsData(cardId: string) {
+  const rows = await fetchAllRows("LEAVE_REQUESTS_TB", cardId);
+  return { rows, total: rows.length };
 }
 
-export async function fetchWFHRequestsData(cardId: string, limit = 100, offset = 0) {
-  const { data, error, count } = await supabase
-    .from("WFH_REQUESTS_TB")
-    .select("*", { count: "exact" })
-    .eq("cardid", cardId)
-    .range(offset, offset + limit - 1);
-  if (error) throw new Error(error.message);
-  return { rows: data ?? [], total: count ?? 0 };
+export async function fetchWFHRequestsData(cardId: string) {
+  const rows = await fetchAllRows("WFH_REQUESTS_TB", cardId);
+  return { rows, total: rows.length };
 }
 
 // ---------------------------------------------------------------------------
@@ -146,11 +145,11 @@ export interface ConsolidatedRow {
 }
 
 export async function fetchConsolidatedReport(cardId: string): Promise<ConsolidatedRow[]> {
-  const [{ data: officeRows }, { data: wfhRows }, { data: leaveRows }, { data: wfhReqRows }] = await Promise.all([
-    supabase.from("OFFICE_CHECKIN_TB").select("*").eq("cardid", cardId),
-    supabase.from("WFH_CLOCKIN_TB").select("*").eq("cardid", cardId),
-    supabase.from("LEAVE_REQUESTS_TB").select("*").eq("cardid", cardId),
-    supabase.from("WFH_REQUESTS_TB").select("*").eq("cardid", cardId),
+  const [officeRows, wfhRows, leaveRows, wfhReqRows] = await Promise.all([
+    fetchAllRows("OFFICE_CHECKIN_TB", cardId),
+    fetchAllRows("WFH_CLOCKIN_TB", cardId),
+    fetchAllRows("LEAVE_REQUESTS_TB", cardId),
+    fetchAllRows("WFH_REQUESTS_TB", cardId),
   ]);
 
   type Cell = { officecheckin: string; wfhclockinsArr: string[]; leavetype: string; leavestatus: string; wfhrequeststatus: string };
@@ -163,43 +162,50 @@ export async function fetchConsolidatedReport(cardId: string): Promise<Consolida
     return dataMap[empId][date];
   };
 
-  for (const row of officeRows ?? []) {
-    const id = row.employeeid as string;
-    const d = row.checkindate as string;
+  const s = (v: unknown): string => (v as string) ?? "";
+
+  for (const row of officeRows) {
+    const id = s(row.employeeid);
+    const d = s(row.checkindate);
     if (!id || !d) continue;
     const c = cell(id, d);
-    if (!c.officecheckin || (row.checkintime as string) < c.officecheckin) c.officecheckin = row.checkintime ?? "";
+    const t = s(row.checkintime);
+    if (!c.officecheckin || t < c.officecheckin) c.officecheckin = t;
   }
 
-  for (const row of wfhRows ?? []) {
-    const id = row.employeeid as string;
-    const ts = row.timestampclockin as string;
+  for (const row of wfhRows) {
+    const id = s(row.employeeid);
+    const ts = s(row.timestampclockin);
     if (!id || !ts) continue;
     const d = ts.includes("T") ? ts.split("T")[0] : ts.split(" ")[0];
     const t = ts.includes("T") ? ts.split("T")[1]?.slice(0, 8) : ts.split(" ")[1]?.slice(0, 8);
     const c = cell(id, d);
     if (t) c.wfhclockinsArr.push(t);
-    if (!empInfo[id]) empInfo[id] = { name: row.employeename ?? "", dept: row.department ?? "", manager: row.reportingmanager ?? "" };
+    if (!empInfo[id]) empInfo[id] = { name: s(row.employeename), dept: s(row.department), manager: s(row.reportingmanager) };
   }
 
-  for (const row of leaveRows ?? []) {
-    const id = row.employeeid as string;
-    if (!id || !row.fromdate || !row.todate) continue;
-    for (const d of expandDateRange(row.fromdate, row.todate)) {
+  for (const row of leaveRows) {
+    const id = s(row.employeeid);
+    const from = s(row.fromdate);
+    const to = s(row.todate);
+    if (!id || !from || !to) continue;
+    for (const d of expandDateRange(from, to)) {
       const c = cell(id, d);
-      c.leavetype = row.leavetype ?? "";
-      c.leavestatus = row.status ?? "";
+      c.leavetype = s(row.leavetype);
+      c.leavestatus = s(row.status);
     }
-    if (!empInfo[id]) empInfo[id] = { name: row.employeename ?? "", dept: row.department ?? "", manager: row.reportingmanager ?? "" };
+    if (!empInfo[id]) empInfo[id] = { name: s(row.employeename), dept: s(row.department), manager: s(row.reportingmanager) };
   }
 
-  for (const row of wfhReqRows ?? []) {
-    const id = row.employeeid as string;
-    if (!id || !row.fromdate || !row.todate) continue;
-    for (const d of expandDateRange(row.fromdate, row.todate)) {
-      cell(id, d).wfhrequeststatus = row.requeststatus ?? "";
+  for (const row of wfhReqRows) {
+    const id = s(row.employeeid);
+    const from = s(row.fromdate);
+    const to = s(row.todate);
+    if (!id || !from || !to) continue;
+    for (const d of expandDateRange(from, to)) {
+      cell(id, d).wfhrequeststatus = s(row.requeststatus);
     }
-    if (!empInfo[id]) empInfo[id] = { name: row.employeename ?? "", dept: row.department ?? "", manager: row.reportingmanager ?? "" };
+    if (!empInfo[id]) empInfo[id] = { name: s(row.employeename), dept: s(row.department), manager: s(row.reportingmanager) };
   }
 
   const result: ConsolidatedRow[] = [];

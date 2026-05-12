@@ -136,7 +136,7 @@ export default function CardDetail() {
 
           {activeTab !== "report" && !tableLoading && tableData && tableData.total > 0 && (
             <div className="space-y-2">
-              <p className="text-xs text-gray-400">Showing {tableData.rows.length} of {tableData.total.toLocaleString()} rows</p>
+              <p className="text-xs text-gray-400">{tableData.total.toLocaleString()} rows</p>
               <ResultsTable
                 columns={
                   activeTab === "office" ? OFFICE_COLS :
