@@ -188,6 +188,9 @@ export async function fetchConsolidatedReport(cardId: string): Promise<Consolida
     mergeEmpInfo(id, s(row.employeename), s(row.department), s(row.reportingmanager));
     const ts = s(row.timestampclockin);
     if (!ts) continue;
+    // Skip "Out" punches — old records have punchstatus null (treated as In)
+    const punch = s(row.punchstatus);
+    if (punch && punch !== "In") continue;
     const d = ts.includes("T") ? ts.split("T")[0] : ts.split(" ")[0];
     const t = ts.includes("T") ? ts.split("T")[1]?.slice(0, 8) : ts.split(" ")[1]?.slice(0, 8);
     const c = cell(id, d);
@@ -320,11 +323,13 @@ export async function fetchEmployeeSummary(cardId: string, employeeId: string): 
     if (!department && row.department) department = row.department as string;
   }
 
-  // WFH clock-ins: all times per date
+  // WFH clock-ins: In-punches only per date (Out punches are clock-outs, not check-ins)
   const wfhDateMap: Record<string, string[]> = {};
   for (const row of (wfhRows ?? [])) {
     const ts = row.timestampclockin as string;
     if (!ts) continue;
+    const punch = (row.punchstatus as string) ?? "";
+    if (punch && punch !== "In") continue;
     const d = ts.includes("T") ? ts.split("T")[0] : ts.split(" ")[0];
     const t = ts.includes("T") ? ts.split("T")[1]?.slice(0, 8) : ts.split(" ")[1]?.slice(0, 8);
     if (!wfhDateMap[d]) wfhDateMap[d] = [];

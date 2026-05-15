@@ -68,6 +68,20 @@ export function parseOfficeCheckin(buffer: ArrayBuffer, cardId: string) {
   return records;
 }
 
+// Converts "04-Apr-2026 09:48:00" → "2026-04-04T09:48:00" (new Remote clock-ins format).
+// Returns null if the string doesn't match, so the caller can fall back.
+const MONTHS: Record<string, string> = {
+  Jan: "01", Feb: "02", Mar: "03", Apr: "04", May: "05", Jun: "06",
+  Jul: "07", Aug: "08", Sep: "09", Oct: "10", Nov: "11", Dec: "12",
+};
+function parseDDMonYYYY(s: string): string | null {
+  const m = s.match(/^(\d{2})-([A-Za-z]{3})-(\d{4}) (\d{2}:\d{2}:\d{2})$/);
+  if (!m) return null;
+  const month = MONTHS[m[2]];
+  if (!month) return null;
+  return `${m[3]}-${month}-${m[1]}T${m[4]}`;
+}
+
 export function parseWFHClockin(buffer: ArrayBuffer, cardId: string) {
   const wb = XLSX.read(buffer, { type: "array", cellDates: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
@@ -87,7 +101,9 @@ export function parseWFHClockin(buffer: ArrayBuffer, cardId: string) {
     if (tsRaw instanceof Date) {
       timestampclockin = tsRaw.toISOString();
     } else if (tsRaw) {
-      timestampclockin = String(tsRaw);
+      const str = String(tsRaw);
+      // New format: "DD-Mon-YYYY HH:MM:SS" → convert to ISO so date extraction works
+      timestampclockin = parseDDMonYYYY(str) ?? str;
     }
 
     records.push({
@@ -98,7 +114,8 @@ export function parseWFHClockin(buffer: ArrayBuffer, cardId: string) {
       department: row[col("Department")] ?? null,
       reportingmanager: row[col("Reporting Manager")] ?? null,
       timestampclockin,
-      requesttype: row[col("Request Type")] ?? null,
+      requesttype: row[col("Request Type")] ?? null,   // null for new format (column removed)
+      punchstatus: row[col("Punch Status")] ?? null,   // "In" / "Out" — new field
       latitude: row[col("Latitude")] ?? null,
       longitude: row[col("Longitude")] ?? null,
       address: row[col("Address")] ?? null,
