@@ -118,7 +118,7 @@ export default function CardDetail() {
         <div>
           <div className="mb-3 flex items-center gap-1 border-b border-gray-200">
             <TabBtn active={activeTab === "office"} onClick={() => setActiveTab("office")} icon={<Building2 size={14} />} label="Office Check-in" count={activeTab === "office" ? tableData?.total : undefined} />
-            <TabBtn active={activeTab === "wfh"} onClick={() => setActiveTab("wfh")} icon={<Wifi size={14} />} label="WFH Clock-in" count={activeTab === "wfh" ? tableData?.total : undefined} />
+            <TabBtn active={activeTab === "wfh"} onClick={() => setActiveTab("wfh")} icon={<Wifi size={14} />} label="Remote Clock-in" count={activeTab === "wfh" ? tableData?.total : undefined} />
             <TabBtn active={activeTab === "leave"} onClick={() => setActiveTab("leave")} icon={<CalendarX size={14} />} label="Leave Requests" count={activeTab === "leave" ? tableData?.total : undefined} />
             <TabBtn active={activeTab === "wfhreq"} onClick={() => setActiveTab("wfhreq")} icon={<CalendarCheck size={14} />} label="WFH Requests" count={activeTab === "wfhreq" ? tableData?.total : undefined} />
             <TabBtn active={activeTab === "report"} onClick={() => setActiveTab("report")} icon={<LayoutList size={14} />} label="Consolidated Report" />
