@@ -45,7 +45,7 @@ export function parseOfficeCheckin(buffer: ArrayBuffer, cardId: string) {
 
   // Row index 1 is the actual header row
   const headers = (rows[1] as string[]) ?? [];
-  const timeIdx = headers.indexOf("Time");
+  const timeIdx = headers.indexOf("First in Time");
   const personnelIdx = headers.indexOf("Personnel ID");
   const firstNameIdx = headers.indexOf("First Name");
   const lastNameIdx = headers.indexOf("Last Name");

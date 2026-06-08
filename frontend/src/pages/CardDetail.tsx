@@ -84,7 +84,7 @@ export default function CardDetail() {
           <div className="grid gap-4 md:grid-cols-2">
             <UploadZone
               label="Office Check-in"
-              description="All Transactions export — filters valid Personnel IDs only"
+              description="First In And Last Out export — filters valid Personnel IDs only"
               onUpload={(file) => uploadOffice(cardId!, file).then((r) => { loadTable(activeTab); return r; })}
             />
             <UploadZone
