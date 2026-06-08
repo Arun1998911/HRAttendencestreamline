@@ -139,7 +139,7 @@ export default function ConsolidatedReport({ cardId }: Props) {
       { header: "Department",         key: "dept",       width: 24 },
       { header: "Reporting Manager",  key: "manager",    width: 24 },
       { header: "Office Check-in",    key: "office",     width: 14 },
-      { header: "WFH Clock-in(s)",    key: "wfh",        width: 22 },
+      { header: "Remote Clock-in(s)", key: "wfh",        width: 22 },
       { header: "Leave Type",         key: "leave",      width: 20 },
       { header: "Leave Status",       key: "leavestatus",width: 14 },
       { header: "WFH Request Status", key: "wfhreq",     width: 20 },
@@ -349,7 +349,7 @@ export default function ConsolidatedReport({ cardId }: Props) {
             <table className="min-w-full divide-y divide-gray-200 text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  {["Date", "Employee ID", "Name", "Department", "Office Check-in", "WFH Clock-in(s)", "Leave", "WFH Request", "Status"].map((h) => (
+                  {["Date", "Employee ID", "Name", "Department", "Office Check-in", "Remote Clock-in(s)", "Leave", "WFH Request", "Status"].map((h) => (
                     <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 whitespace-nowrap">
                       {h}
                     </th>
