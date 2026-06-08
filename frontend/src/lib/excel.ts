@@ -113,7 +113,7 @@ export function parseWFHClockin(buffer: ArrayBuffer, cardId: string) {
       timestampclockin = parseDDMonYYYY(str) ?? str;
     }
 
-    records.push({
+    const record: Record<string, unknown> = {
       cardid: cardId,
       employeeid: String(row[col("Employee Number")] ?? ""),
       employeename: row[col("Employee Name")] ?? null,
@@ -121,13 +121,17 @@ export function parseWFHClockin(buffer: ArrayBuffer, cardId: string) {
       department: row[col("Department")] ?? null,
       reportingmanager: row[col("Reporting Manager")] ?? null,
       timestampclockin,
-      requesttype: row[col("Request Type")] ?? null,   // null for new format (column removed)
-      punchstatus: row[col("Punch Status")] ?? null,   // "In" / "Out" — new field
+      requesttype: row[col("Request Type")] ?? null,
       latitude: row[col("Latitude")] ?? null,
       longitude: row[col("Longitude")] ?? null,
       address: row[col("Address")] ?? null,
       note: row[col("Note")] ?? null,
-    });
+    };
+    // Only include punchstatus when the column exists in the file and has a value.
+    // Omitting the key entirely lets old-format uploads work without the DB column.
+    const ps = row[col("Punch Status")];
+    if (ps != null) record.punchstatus = ps;
+    records.push(record);
   }
   return records;
 }
