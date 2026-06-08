@@ -88,8 +88,8 @@ export default function CardDetail() {
               onUpload={(file) => uploadOffice(cardId!, file).then((r) => { loadTable(activeTab); return r; })}
             />
             <UploadZone
-              label="WFH Clock-in"
-              description="Working Remotely clock-ins export (KSPL employee IDs)"
+              label="Remote Clock-in"
+              description="Remote clock-ins export (KSPL employee IDs)"
               onUpload={(file) => uploadWFH(cardId!, file).then((r) => { loadTable(activeTab); return r; })}
             />
             <UploadZone
