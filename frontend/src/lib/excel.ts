@@ -2,7 +2,14 @@ import * as XLSX from "xlsx";
 
 function toISODate(val: unknown): string | null {
   if (!val) return null;
-  if (val instanceof Date) return val.toISOString().split("T")[0];
+  if (val instanceof Date) {
+    // Use local date components — toISOString() returns UTC which shifts the date
+    // by one day for UTC+ timezones (e.g. IST midnight local = previous day in UTC).
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, "0");
+    const d = String(val.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
   return String(val);
 }
 

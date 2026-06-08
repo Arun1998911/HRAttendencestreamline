@@ -293,10 +293,16 @@ export interface EmployeeSummary {
 
 function expandDateRange(from: string, to: string): string[] {
   const dates: string[] = [];
-  const end = new Date(to);
-  const cur = new Date(from);
-  while (cur <= end) {
-    dates.push(cur.toISOString().split("T")[0]);
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  // Numeric Date constructor = always local time, avoids UTC-offset date shifting
+  const cur = new Date(fy, fm - 1, fd);
+  const end = new Date(ty, tm - 1, td);
+  while (cur.getTime() <= end.getTime()) {
+    const y = cur.getFullYear();
+    const mo = cur.getMonth() + 1;
+    const d = cur.getDate();
+    dates.push(`${y}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
     cur.setDate(cur.getDate() + 1);
   }
   return dates;
