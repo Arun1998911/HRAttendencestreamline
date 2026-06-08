@@ -3,11 +3,15 @@ import * as XLSX from "xlsx";
 function toISODate(val: unknown): string | null {
   if (!val) return null;
   if (val instanceof Date) {
-    // Use local date components — toISOString() returns UTC which shifts the date
-    // by one day for UTC+ timezones (e.g. IST midnight local = previous day in UTC).
-    const y = val.getFullYear();
-    const m = String(val.getMonth() + 1).padStart(2, "0");
-    const d = String(val.getDate()).padStart(2, "0");
+    // Darwinbox exports "date only" cells as timestamps ~10 seconds before midnight IST
+    // (e.g. 2026-05-08 intended → stored as 2026-05-07T18:29:50Z = 2026-05-07T23:59:50 IST).
+    // Both toISOString() and local getDate() return the wrong day.
+    // Fix: shift +12 hours then read UTC date — this rounds any near-midnight
+    // timestamp to the correct calendar day regardless of machine timezone.
+    const shifted = new Date(val.getTime() + 12 * 60 * 60 * 1000);
+    const y = shifted.getUTCFullYear();
+    const m = String(shifted.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(shifted.getUTCDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }
   return String(val);
