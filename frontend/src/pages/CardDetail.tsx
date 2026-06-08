@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Building2, Wifi, CalendarX, CalendarCheck, LayoutList } from "lucide-react";
 import { fetchCard, uploadOffice, uploadWFH, uploadLeaveRequests, uploadWFHRequests, fetchOfficeData, fetchWFHData, fetchLeaveRequestsData, fetchWFHRequestsData } from "../lib/api";
 import UploadZone from "../components/UploadZone";
+import BrandBadge from "../components/BrandBadge";
 import ResultsTable from "../components/ResultsTable";
 import EmployeeLookup from "../components/EmployeeLookup";
 import ConsolidatedReport from "../components/ConsolidatedReport";
@@ -57,23 +58,28 @@ export default function CardDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="border-b border-gray-200 bg-white px-6 py-4">
-        <div className="mx-auto max-w-6xl">
-          <button
-            onClick={() => navigate("/")}
-            className="mb-3 flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
-          >
-            <ArrowLeft size={15} />
-            All Reports
-          </button>
-          {card && (
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">{card.cardname}</h1>
-              {card.carddescription && (
-                <p className="text-sm text-gray-500 mt-0.5">{card.carddescription}</p>
-              )}
-              <p className="text-xs text-gray-400 mt-1">Created by {card.createdby}</p>
-            </div>
-          )}
+        <div className="mx-auto max-w-6xl flex items-start justify-between">
+          <div>
+            <button
+              onClick={() => navigate("/")}
+              className="mb-3 flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+            >
+              <ArrowLeft size={15} />
+              All Reports
+            </button>
+            {card && (
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">{card.cardname}</h1>
+                {card.carddescription && (
+                  <p className="text-sm text-gray-500 mt-0.5">{card.carddescription}</p>
+                )}
+                <p className="text-xs text-gray-400 mt-1">Created by {card.createdby}</p>
+              </div>
+            )}
+          </div>
+          <div className="mt-1">
+            <BrandBadge />
+          </div>
         </div>
       </header>
 

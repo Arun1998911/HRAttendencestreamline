@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, FileSpreadsheet, ChevronRight, User } from "lucide-react";
 import { fetchCards, type ReportCard } from "../lib/api";
 import CreateCardModal from "../components/CreateCardModal";
+import BrandBadge from "../components/BrandBadge";
 
 export default function Home() {
   const [cards, setCards] = useState<ReportCard[]>([]);
@@ -30,13 +31,16 @@ export default function Home() {
             <h1 className="text-xl font-bold text-gray-900">HR Attendance</h1>
             <p className="text-xs text-gray-500">Attendance consolidation reports</p>
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={16} />
-            New Report
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowCreate(true)}
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={16} />
+              New Report
+            </button>
+            <BrandBadge />
+          </div>
         </div>
       </header>
 
